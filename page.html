@@ -11,16 +11,52 @@
     <div class="max-w-7xl mx-auto">
 
         <div class="flex justify-end mb-4">
-            <select id="langSelect" class="bg-white border border-slate-200 rounded-lg p-1 text-sm outline-indigo-500">
-                <option value="fr">🇫🇷 Français</option>
-                <option value="en">🇺🇸 English</option>
-                <option value="es">🇪🇸 Español</option>
-            </select>
+            <div class="flex items-center gap-4 bg-white border border-slate-200 rounded-lg px-3 py-1 text-sm shadow-sm font-medium">
+                <div class="flex items-center gap-2 border-r border-slate-100 pr-3">
+                    <span class="text-slate-400 text-xs font-bold uppercase tracking-wider">Devise d'affichage</span>
+                    <select id="currSelect" class="bg-transparent outline-none font-bold text-indigo-600 cursor-pointer">
+                        <option value="EUR">€ EUR</option>
+                        <option value="USD">$ USD</option>
+                        <option value="GBP">£ GBP</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-slate-400 text-xs font-bold uppercase tracking-wider">Langue</span>
+                    <select id="langSelect" class="bg-transparent outline-none cursor-pointer">
+                        <option value="fr">🇫🇷 Français</option>
+                        <option value="en">🇺🇸 English</option>
+                        <option value="es">🇪🇸 Español</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Aide Contextuelle -->
+        <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-6 mb-8 flex flex-col md:flex-row gap-6 items-center">
+            <div class="flex-1">
+                <h3 class="text-indigo-900 font-bold mb-2 flex items-center gap-2">
+                    <span class="text-xl">💡</span> <span data-i18n="helpTitle">Aide & Guide</span>
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-indigo-700">
+                    <div data-i18n="helpStep1">1. Tickers : Configurez vos ETFs dans get_data.py et lancez le script.</div>
+                    <div data-i18n="helpStep2">2. Portefeuilles : Créez des paniers complexes dans l'onglet 'Portefeuilles'.</div>
+                    <div data-i18n="helpStep3">3. Analyse : Comparez les performances réelles (Total Return) et les risques.</div>
+                </div>
+            </div>
         </div>
         
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
             <div class="lg:col-span-1 space-y-6">
+                <!-- Section Portefeuilles -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h2 class="text-lg font-bold mb-4 flex items-center justify-between">
+                        <span data-i18n="portfoliosTitle">📁 Portefeuilles</span>
+                        <button onclick="addPortfolio()" class="text-xs bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-500 transition" data-i18n="addPtf">+ Créer</button>
+                    </h2>
+                    <div id="portfoliosList" class="space-y-4"></div>
+                </div>
+
                 <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                     <h2 class="text-lg font-bold mb-4 flex items-center" data-i18n="configTitle">⚙️ Configuration</h2>
                     
@@ -81,6 +117,8 @@
                         <thead class="bg-slate-50 text-slate-500">
                             <tr>
                                 <th class="p-4 uppercase text-xs font-bold" data-i18n="thNom">Nom / Catégorie</th>
+                                <th class="p-4 uppercase text-xs font-bold text-center" data-i18n="thDevise">Devise</th>
+                                <th class="p-4 uppercase text-xs font-bold text-center" data-i18n="thTER">TER / Yield</th>
                                 <th class="p-4 uppercase text-xs font-bold text-center" data-i18n="thPerf">Perf Ann.</th>
                                 <th class="p-4 uppercase text-xs font-bold text-center" data-i18n="thTE">Track. Error</th>
                                 <th class="p-4 uppercase text-xs font-bold text-center" data-i18n="thVol">Volatilité</th>
@@ -119,6 +157,7 @@
 
     <script>
         let fullData = {};
+        let userPortfolios = []; // { name: string, components: {ticker: weight}, rebalance: string }
         let mainChart = null;
         let focusChart = null;
         const colors = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
@@ -136,15 +175,31 @@
                 sectors: "Secteurs",
                 assets: "Classe d'actifs",
                 thNom: "Nom / Catégorie",
+                thDevise: "Devise",
+                thTER: "TER / Yield",
                 thPerf: "Perf Ann.",
                 thTE: "Track. Error",
                 thVol: "Volatilité",
                 thTD: "TD Cumulée",
+                portfoliosTitle: "📁 Portefeuilles",
+                addPtf: "+ Créer un Portefeuille",
+                ptfNamePlace: "Nom du portefeuille...",
+                ptfWeight: "Poids (%)",
+                rebalanceLabel: "Rééquilibrage",
+                rebalanceNone: "Aucun",
+                rebalanceMonthly: "Mensuel",
+                rebalanceQuarterly: "Trimestriel",
+                rebalanceSemiannual: "Semestriel",
+                rebalanceAnnual: "Annuel",
                 yAxisPerf: "Performance (Base 100)",
                 yAxisTD: "Tracking Diff. Cumulée (%)",
                 errDates: "Erreur : Pas assez de dates communes entre les ETFs sélectionnés et le benchmark.",
                 noData: "⚠️ Erreur de données",
-                generateData: "Lancez python get_data.py pour générer les données."
+                generateData: "Lancez python get_data.py pour générer les données.",
+                helpTitle: "Aide & Guide",
+                helpStep1: "1. Tickers : Configurez vos ETFs dans get_data.py et lancez le script.",
+                helpStep2: "2. Portefeuilles : Créez des paniers complexes dans l'onglet 'Portefeuilles'.",
+                helpStep3: "3. Analyse : Comparez les performances réelles (Total Return) et les risques."
             },
             en: {
                 configTitle: "⚙️ Settings",
@@ -158,15 +213,31 @@
                 sectors: "Sectors",
                 assets: "Asset Classes",
                 thNom: "Name / Category",
+                thDevise: "Currency",
+                thTER: "TER / Yield",
                 thPerf: "Ann. Perf",
                 thTE: "Track. Error",
                 thVol: "Volatility",
                 thTD: "Cumul. TD",
+                portfoliosTitle: "📁 Portfolios",
+                addPtf: "+ Create Portfolio",
+                ptfNamePlace: "Portfolio name...",
+                ptfWeight: "Weight (%)",
+                rebalanceLabel: "Rebalancing",
+                rebalanceNone: "None",
+                rebalanceMonthly: "Monthly",
+                rebalanceQuarterly: "Quarterly",
+                rebalanceSemiannual: "Semiannual",
+                rebalanceAnnual: "Annual",
                 yAxisPerf: "Performance (Base 100)",
                 yAxisTD: "Cumul. Tracking Diff (%)",
                 errDates: "Error: Not enough common dates between selected ETFs and benchmark.",
                 noData: "⚠️ Data Error",
-                generateData: "Run python get_data.py to generate data."
+                generateData: "Run python get_data.py to generate data.",
+                helpTitle: "Help & Guide",
+                helpStep1: "1. Tickers: Config your ETFs in get_data.py and run the script.",
+                helpStep2: "2. Portfolios: Create complex baskets in the 'Portfolios' tab.",
+                helpStep3: "3. Analysis: Compare real performance (Total Return) and risks."
             },
             es: {
                 configTitle: "⚙️ Configuración",
@@ -180,15 +251,31 @@
                 sectors: "Sectores",
                 assets: "Clase de activos",
                 thNom: "Nombre / Categoría",
+                thTER: "TER / Yield",
+                thDevise: "Moneda",
                 thPerf: "Perf An.",
                 thTE: "Error de Seguimiento",
                 thVol: "Volatilidad",
                 thTD: "TD Acumulada",
+                portfoliosTitle: "📁 Carteras",
+                addPtf: "+ Crear Cartera",
+                ptfNamePlace: "Nombre de la cartera...",
+                ptfWeight: "Peso (%)",
+                rebalanceLabel: "Reequilibrio",
+                rebalanceNone: "Ninguno",
+                rebalanceMonthly: "Mensual",
+                rebalanceQuarterly: "Trimestral",
+                rebalanceSemiannual: "Semestral",
+                rebalanceAnnual: "Anual",
                 yAxisPerf: "Rendimiento (Base 100)",
                 yAxisTD: "Diferencia de Seguimiento Acum. (%)",
                 errDates: "Error: No hay suficientes fechas comunes entre los ETFs seleccionados y el benchmark.",
                 noData: "⚠️ Error de datos",
-                generateData: "Ejecute python get_data.py para generar datos."
+                generateData: "Ejecute python get_data.py para generar datos.",
+                helpTitle: "Ayuda & Guía",
+                helpStep1: "1. Tickers: Configure sus ETFs en get_data.py y ejecute el script.",
+                helpStep2: "2. Carteras: Cree cestas complejas en la pestaña 'Carteras'.",
+                helpStep3: "3. Análisis: Compare el rendimiento real (Total Return) y los riesgos."
             }
         };
 
@@ -202,6 +289,7 @@
                     el.innerText = translations[currentLang][key];
                 }
             });
+            renderPortfolios();
             updateApp();
         }
 
@@ -231,6 +319,7 @@
                 // Events
                 bSelect.onchange = updateApp;
                 document.getElementById('periodSelect').onchange = updateApp;
+                document.getElementById('currSelect').onchange = updateApp;
                 document.getElementById('focusType').onchange = () => updateFocus(bSelect.value);
                 document.getElementById('langSelect').onchange = updateLanguage;
 
@@ -248,7 +337,7 @@
         }
 
         function addRow() {
-            const all = Object.keys(fullData.prices);
+            const all = [...Object.keys(fullData.prices), ...userPortfolios.map(p => p.name)].sort();
             const next = all.find(t => !selectedTickers.includes(t)) || all[0];
             selectedTickers.push(next);
             updateApp();
@@ -265,74 +354,239 @@
             updateApp();
         }
 
+        // --- PORTFOLIO LOGIC ---
+        function addPortfolio() {
+            userPortfolios.push({
+                name: `Portefeuille ${userPortfolios.length + 1}`,
+                rebalance: 'annual',
+                components: [] // [{ticker, weight}]
+            });
+            renderPortfolios();
+            updateApp();
+        }
+
+        function deletePortfolio(idx) {
+            const ptfName = userPortfolios[idx].name;
+            userPortfolios.splice(idx, 1);
+            selectedTickers = selectedTickers.filter(t => t !== ptfName);
+            const benchSelect = document.getElementById('benchSelect');
+            if(benchSelect.value === ptfName) benchSelect.selectedIndex = 0;
+            renderPortfolios();
+            updateApp();
+        }
+
+        function addPortfolioComponent(ptfIdx) {
+            const tickers = Object.keys(fullData.prices);
+            userPortfolios[ptfIdx].components.push({ ticker: tickers[0], weight: 0 });
+            renderPortfolios();
+            updateApp();
+        }
+
+        function removePortfolioComponent(ptfIdx, compIdx) {
+            userPortfolios[ptfIdx].components.splice(compIdx, 1);
+            renderPortfolios();
+            updateApp();
+        }
+
+        function updatePtf(ptfIdx, field, value) {
+            userPortfolios[ptfIdx][field] = value;
+            if(field === 'name') {
+                // We don't want to break the links if name changes, but for simplicity:
+                updateApp();
+            } else {
+                updateApp();
+            }
+            renderPortfolios();
+        }
+
+        function updatePtfComp(ptfIdx, compIdx, field, value) {
+            if(field === 'weight') value = parseFloat(value) || 0;
+            userPortfolios[ptfIdx].components[compIdx][field] = value;
+            renderPortfolios();
+            updateApp();
+        }
+
+        function renderPortfolios() {
+            const container = document.getElementById('portfoliosList');
+            const allTickers = Object.keys(fullData.prices).sort();
+            const t = translations[currentLang];
+
+            container.innerHTML = userPortfolios.map((ptf, ptfIdx) => `
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 relative group">
+                    <button onclick="deletePortfolio(${ptfIdx})" class="absolute top-2 right-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition">✕</button>
+                    <input type="text" value="${ptf.name}" onchange="updatePtf(${ptfIdx}, 'name', this.value)" 
+                           class="w-4/5 bg-transparent font-bold text-indigo-600 focus:outline-none mb-3 border-b border-transparent focus:border-indigo-300">
+                    
+                    <div class="space-y-2 mb-3">
+                        ${ptf.components.map((comp, compIdx) => `
+                            <div class="flex gap-2 items-center">
+                                <select onchange="updatePtfComp(${ptfIdx}, ${compIdx}, 'ticker', this.value)" class="bg-white border-none text-[11px] rounded p-1 flex-1 shadow-sm">
+                                    ${allTickers.map(ticker => `<option value="${ticker}" ${ticker===comp.ticker?'selected':''}>${ticker}</option>`).join('')}
+                                </select>
+                                <div class="flex items-center gap-1 w-20">
+                                    <input type="number" value="${comp.weight}" onchange="updatePtfComp(${ptfIdx}, ${compIdx}, 'weight', this.value)" 
+                                           class="w-full bg-white border-none text-[11px] rounded p-1 shadow-sm text-center">
+                                    <span class="text-[10px] text-slate-400">%</span>
+                                </div>
+                                <button onclick="removePortfolioComponent(${ptfIdx}, ${compIdx})" class="text-slate-300 hover:text-red-500 text-xs">×</button>
+                            </div>
+                        `).join('')}
+                        <button onclick="addPortfolioComponent(${ptfIdx})" class="text-[10px] text-indigo-500 hover:underline">+ Ajouter ETF</button>
+                    </div>
+
+                    <div class="flex items-center justify-between mt-2 pt-2 border-t border-slate-200">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase">${t.rebalanceLabel}</label>
+                        <select onchange="updatePtf(${ptfIdx}, 'rebalance', this.value)" class="bg-transparent text-[10px] font-bold text-slate-600 border-none outline-none">
+                            <option value="none" ${ptf.rebalance==='none'?'selected':''}>${t.rebalanceNone}</option>
+                            <option value="monthly" ${ptf.rebalance==='monthly'?'selected':''}>${t.rebalanceMonthly}</option>
+                            <option value="quarterly" ${ptf.rebalance==='quarterly'?'selected':''}>${t.rebalanceQuarterly}</option>
+                            <option value="semiannual" ${ptf.rebalance==='semiannual'?'selected':''}>${t.rebalanceSemiannual}</option>
+                            <option value="annual" ${ptf.rebalance==='annual'?'selected':''}>${t.rebalanceAnnual}</option>
+                        </select>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function shouldRebalance(dateStr, prevDateStr, freq) {
+            if (freq === 'none') return false;
+            const d = new Date(dateStr);
+            const pd = new Date(prevDateStr);
+            if (freq === 'monthly') return d.getMonth() !== pd.getMonth();
+            if (freq === 'quarterly') return Math.floor(d.getMonth()/3) !== Math.floor(pd.getMonth()/3);
+            if (freq === 'semiannual') return Math.floor(d.getMonth()/6) !== Math.floor(pd.getMonth()/6);
+            if (freq === 'annual') return d.getFullYear() !== pd.getFullYear();
+            return false;
+        }
+
         function updateApp() {
             const bench = document.getElementById('benchSelect').value;
             const period = parseInt(document.getElementById('periodSelect').value);
+            const targetCurr = document.getElementById('currSelect').value;
             
-            // 1. Déterminer les dates communes pour les tickers sélectionnés + le benchmark
-            const involvedTickers = Array.from(new Set([...selectedTickers, bench]));
-            
+            // 1. Déterminer les tickers réels nécessaires
+            let requiredRealTickers = new Set();
+            const getReal = (name) => {
+                const ptf = userPortfolios.find(p => p.name === name);
+                if(ptf) ptf.components.forEach(c => requiredRealTickers.add(c.ticker));
+                else if(fullData.prices[name]) requiredRealTickers.add(name);
+            };
+            selectedTickers.forEach(getReal);
+            getReal(bench);
+
+            // 2. Dates communes pour ces tickers réels
             let commonDatesSet = null;
-            involvedTickers.forEach(t => {
+            requiredRealTickers.forEach(t => {
                 const dates = Object.keys(fullData.prices[t]);
-                if (commonDatesSet === null) {
-                    commonDatesSet = new Set(dates);
-                } else {
-                    commonDatesSet = new Set(dates.filter(d => commonDatesSet.has(d)));
-                }
+                if (commonDatesSet === null) commonDatesSet = new Set(dates);
+                else commonDatesSet = new Set(dates.filter(d => commonDatesSet.has(d)));
             });
 
-            if (!commonDatesSet || commonDatesSet.size < 2) {
-                alert(translations[currentLang].errDates);
-                return;
-            }
+            if (!commonDatesSet || commonDatesSet.size < 2) return;
 
-            // Trier les dates
             let sortedDates = Array.from(commonDatesSet).sort();
-            
-            // Appliquer la période
-            if (period > 0 && sortedDates.length > period) {
-                sortedDates = sortedDates.slice(-period);
-            }
-
+            if (period > 0 && sortedDates.length > period) sortedDates = sortedDates.slice(-period);
             const dates = sortedDates;
-            const bPrices = dates.map(d => fullData.prices[bench][d]);
+
+            // 3. Helper de conversion avec ffill pour les taux de change
+            const getFX = (from, to, date) => {
+                if (from === to) return 1;
+                const pair = `${from}${to}=X`;
+                const rates = fullData.fx_rates[pair];
+                if (!rates) return 1;
+                if (rates[date]) return rates[date];
+                // Fallback ffill simple : chercher la date précédente disponible
+                const allDates = Object.keys(rates).sort();
+                const prevDate = allDates.reverse().find(d => d <= date);
+                return prevDate ? rates[prevDate] : 1;
+            };
+
+            // 4. Calculer les séries de prix converties pour tous les tickers réels concernés
+            const convertedRealPrices = {};
+            requiredRealTickers.forEach(t => {
+                const baseCurr = fullData.metadata[t].currency;
+                convertedRealPrices[t] = {};
+                dates.forEach(d => {
+                    const basePrice = fullData.prices[t][d];
+                    const fx = getFX(baseCurr, targetCurr, d);
+                    convertedRealPrices[t][d] = basePrice * fx;
+                });
+            });
+
+            // 5. Calculer les séries de prix pour les portfolios (basés sur les prix convertis)
+            const ptfPrices = {};
+            userPortfolios.forEach(ptf => {
+                // Pour les portfolios, on recalcule la valeur en injectant les prix convertis
+                const prices = {};
+                if (!ptf.components || ptf.components.length === 0) return;
+                
+                let totalValue = 100;
+                let shares = {};
+                const firstDate = dates[0];
+                
+                ptf.components.forEach(comp => {
+                    const p = convertedRealPrices[comp.ticker][firstDate];
+                    shares[comp.ticker] = (totalValue * (comp.weight / 100)) / p;
+                });
+                prices[firstDate] = totalValue;
+
+                for (let i = 1; i < dates.length; i++) {
+                    const date = dates[i];
+                    const prevDate = dates[i - 1];
+                    totalValue = 0;
+                    ptf.components.forEach(comp => {
+                        totalValue += shares[comp.ticker] * convertedRealPrices[comp.ticker][date];
+                    });
+
+                    if (shouldRebalance(date, prevDate, ptf.rebalance)) {
+                        ptf.components.forEach(comp => {
+                            shares[comp.ticker] = (totalValue * (comp.weight / 100)) / convertedRealPrices[comp.ticker][date];
+                        });
+                    }
+                    prices[date] = totalValue;
+                }
+                ptfPrices[ptf.name] = prices;
+            });
+
+            // Helper final pour obtenir le prix prêt à l'emploi
+            const getPrice = (name, d) => ptfPrices[name] ? ptfPrices[name][d] : convertedRealPrices[name][d];
+            const bPrices = dates.map(d => getPrice(bench, d));
 
             const datasets = [];
             const tableHtml = [];
             const configHtml = [];
+            
+            const allAvailable = [...Object.keys(fullData.prices), ...userPortfolios.map(p => p.name)].sort();
+            
+            const bSelect = document.getElementById('benchSelect');
+            const currentBench = bSelect.value;
+            bSelect.innerHTML = allAvailable.map(t => `<option value="${t}" ${t===currentBench?'selected':''}>${t}</option>`).join('');
 
             selectedTickers.forEach((ticker, idx) => {
-                const prices = dates.map(d => fullData.prices[ticker][d]);
-                const meta = fullData.metadata[ticker];
+                const prices = dates.map(d => getPrice(ticker, d));
+                if (!prices || prices.length === 0 || prices[0] === undefined) return;
+
+                const ptfObj = userPortfolios.find(p => p.name === ticker);
+                const meta = ptfObj ? { name: "Portfolio", category: "CUSTOM", currency: targetCurr } : fullData.metadata[ticker];
                 const color = colors[idx % colors.length];
 
-                // Calculs (sur la base filtrée des dates communes)
+                // Calculs
                 const annRet = (Math.pow(prices[prices.length-1]/prices[0], 252/prices.length) - 1);
-                let te = 0;
-                let ctd = 0;
+                let te = 0, ctd = 0;
                 if(ticker !== bench) {
                     const diffs = prices.map((p, i) => i>0 ? (Math.log(p/prices[i-1])) - (Math.log(bPrices[i]/bPrices[i-1])) : 0).slice(1);
                     te = Math.sqrt(diffs.reduce((a,b)=>a+b*b,0)/diffs.length) * Math.sqrt(252);
                     ctd = (prices[prices.length-1]/prices[0] - bPrices[bPrices.length-1]/bPrices[0]) * 100;
                 }
 
-                // Calcul Volatilité Indépendante (alignée sur les dates de début/fin du graph)
-                const startDate = dates[0];
-                const endDate = dates[dates.length - 1];
-                const tickerAllDates = Object.keys(fullData.prices[ticker]).sort();
-                const filteredVolDates = tickerAllDates.filter(d => d >= startDate && d <= endDate);
-                let volPrices = filteredVolDates.map(d => fullData.prices[ticker][d]);
-                
                 let vol = 0;
-                if (volPrices.length > 1) {
-                    const volReturns = volPrices.map((p, i) => i > 0 ? Math.log(p / volPrices[i-1]) : 0).slice(1);
+                const volReturns = prices.map((p, i) => i > 0 ? Math.log(p / prices[i-1]) : 0).slice(1);
+                if(volReturns.length > 0) {
                     const meanVol = volReturns.reduce((a, b) => a + b, 0) / volReturns.length;
                     const varVol = volReturns.reduce((a, b) => a + Math.pow(b - meanVol, 2), 0) / volReturns.length;
                     vol = Math.sqrt(varVol * 252) * 100;
                 }
 
-                // Data Graphique Perf
                 datasets.push({
                     label: ticker,
                     data: prices.map(p => (p/prices[0])*100),
@@ -342,21 +596,14 @@
                     yAxisID: 'y'
                 });
 
-                // Data Graphique TD (si ce n'est pas le benchmark)
                 if (ticker !== bench) {
                     datasets.push({
                         label: `TD ${ticker}`,
                         data: prices.map((p, i) => (p/prices[0] - bPrices[i]/bPrices[0]) * 100),
-                        borderColor: color,
-                        borderWidth: 1,
-                        borderDash: [5, 5],
-                        pointRadius: 0,
-                        yAxisID: 'yTD',
-                        hidden: false // Visible par défaut
+                        borderColor: color, borderWidth: 1, borderDash: [5, 5], pointRadius: 0, yAxisID: 'yTD'
                     });
                 }
 
-                // HTML Lignes Config
                 configHtml.push(`
                     <div class="relative border border-slate-200 rounded-xl p-3 hover:border-indigo-300 transition bg-white shadow-sm overflow-hidden min-h-[85px] flex flex-col justify-center">
                         <div class="pointer-events-none">
@@ -365,9 +612,9 @@
                             <div class="text-[10px] font-bold text-slate-400 uppercase">${meta.category}</div>
                         </div>
                         <select onchange="updateTicker(${idx}, this.value)" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
-                            ${Object.keys(fullData.prices).sort().map(t => `
+                            ${allAvailable.map(t => `
                                 <option value="${t}" ${t===ticker?'selected':''}>
-                                    ${t} - ${fullData.metadata[t].name.substring(0,40)}${fullData.metadata[t].name.length > 40 ? '...' : ''} [${fullData.metadata[t].category}]
+                                    ${t} ${fullData.metadata[t] ? '- ' + fullData.metadata[t].name.substring(0,30) : ''}
                                 </option>
                             `).join('')}
                         </select>
@@ -375,7 +622,6 @@
                     </div>
                 `);
 
-                // HTML Tableau
                 tableHtml.push(`
                     <tr class="border-b border-slate-50">
                         <td class="p-4">
@@ -388,6 +634,14 @@
                                 </div>
                             </div>
                         </td>
+                        <td class="p-4 text-center">
+                            <div class="text-xs font-bold text-slate-600">${meta.currency}</div>
+                            ${meta.currency !== targetCurr ? `<div class="text-[9px] text-indigo-400 font-bold">→ ${targetCurr}</div>` : ''}
+                        </td>
+                        <td class="p-4 text-center">
+                            <div class="text-xs font-bold text-slate-600">${(meta.ter && meta.ter > 0) ? meta.ter.toFixed(2)+'%' : '-'}</div>
+                            <div class="text-[10px] text-slate-400">${(meta.yield && meta.yield > 0) ? meta.yield.toFixed(2)+'%' : '-'}</div>
+                        </td>
                         <td class="p-4 text-center font-bold text-green-600">${(annRet*100).toFixed(2)}%</td>
                         <td class="p-4 text-center text-orange-500">${ticker===bench?'-':(te*100).toFixed(2)+'%'}</td>
                         <td class="p-4 text-center text-slate-600">${vol.toFixed(2)}%</td>
@@ -399,7 +653,7 @@
             document.getElementById('tickerList').innerHTML = configHtml.join('');
             document.getElementById('metricsTableBody').innerHTML = tableHtml.join('');
             renderMainChart(dates, datasets);
-            updateFocus(bench);
+            if(fullData.metadata[bench]) updateFocus(bench);
         }
 
         function renderMainChart(labels, datasets) {
@@ -515,5 +769,8 @@
 
         init();
     </script>
+    <div class="max-w-[1400px] mx-auto px-4 py-8 text-center text-slate-400 text-xs text-center">
+        * Les données incluent le réinvestissement des dividendes (Total Return) pour une comparaison équitable.
+    </div>
 </body>
 </html>

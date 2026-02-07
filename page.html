@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>ETF Pro Comparator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 p-4 md:p-8">
+    <div class="max-w-7xl mx-auto">
+        <div class="flex justify-end mb-4">
+            <select id="langSelect" class="bg-white border border-slate-200 rounded-lg p-1 text-sm outline-indigo-500">
+                <option value="fr">🇫🇷 Français</option>
+                <option value="en">🇺🇸 English</option>
+                <option value="es">🇪🇸 Español</option>
+            </select>
+        </div>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <div class="lg:col-span-1 space-y-6">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h2 class="text-lg font-bold mb-4 flex items-center" data-i18n="configTitle">⚙️ Configuration</h2>
+                    
+                    <div class="mb-4">
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1" data-i18n="benchLabel">Référence (Benchmark)</label>
+                        <select id="benchSelect" class="w-full bg-slate-100 rounded-lg p-2 border-none outline-indigo-500"></select>
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1" data-i18n="periodLabel">Période</label>
+                        <select id="periodSelect" class="w-full bg-slate-100 rounded-lg p-2 border-none">
+                            <option value="252" data-i18n="1y">1 an</option>
+                            <option value="756" data-i18n="3y">3 ans</option>
+                            <option value="1260" selected data-i18n="5y">5 ans</option>
+                            <option value="2520" data-i18n="10y">10 ans</option>
+                            <option value="3780" data-i18n="15y">15 ans</option>
+                            <option value="5040" data-i18n="20y">20 ans</option>
+                            <option value="6200" data-i18n="25y">25 ans</option>
+                            <option value="7360" data-i18n="30y">30 ans</option>
+                            <option value="8520" data-i18n="35y">35 ans</option>
+                            <option value="9680" data-i18n="40y">40 ans</option>
+                        </select>
+                    </div>
+
+                    <div id="tickerListWrapper" class="space-y-3">
+                        <label class="block text-xs font-bold text-slate-400 uppercase" data-i18n="compareLabel">ETFs à comparer</label>
+                        <div id="tickerList" class="space-y-3"></div>
+                    </div>
+                    
+                    <button onclick="addRow()" class="mt-4 w-full py-2 bg-indigo-50 text-indigo-600 rounded-lg font-bold hover:bg-indigo-100 transition" data-i18n="addEtf">+ Ajouter un ETF</button>
+                </div>
+
+                <div class="bg-indigo-900 text-white p-6 rounded-2xl shadow-xl">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold"><span data-i18n="focusTitle">Focus :</span> <span id="focusName">--</span></h3>
+                        <select id="focusType" class="bg-indigo-800 text-xs border-none rounded p-1">
+                            <option value="holdings" data-i18n="top10">Top 10</option>
+                            <option value="sectors" data-i18n="sectors">Secteurs</option>
+                            <option value="assets" data-i18n="assets">Classe d'actifs</option>
+                        </select>
+                    </div>
+                    <div id="focusContent" class="h-64 flex items-center justify-center">
+                        <canvas id="focusChart"></canvas>
+                    </div>
+                    <div id="holdingsList" class="text-xs space-y-1 hidden"></div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-2 space-y-6">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <div class="h-[400px]">
+                        <canvas id="mainChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-50 text-slate-500">
+                            <tr>
+                                <th class="p-4 uppercase text-xs font-bold" data-i18n="thNom">Nom / Catégorie</th>
+                                <th class="p-4 uppercase text-xs font-bold text-center" data-i18n="thPerf">Perf Ann.</th>
+                                <th class="p-4 uppercase text-xs font-bold text-center" data-i18n="thTE">Track. Error</th>
+                                <th class="p-4 uppercase text-xs font-bold text-center" data-i18n="thVol">Volatilité</th>
+                                <th class="p-4 uppercase text-xs font-bold text-center" data-i18n="thTD">TD Cumulée</th>
+                                <th class="p-4"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="metricsTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let fullData = {};
+        let mainChart = null;
+        let focusChart = null;
+        const colors = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+        
+        const translations = {
+            fr: {
+                configTitle: "⚙️ Configuration",
+                benchLabel: "Référence (Benchmark)",
+                periodLabel: "Période",
+                "1y": "1 an", "3y": "3 ans", "5y": "5 ans", "10y": "10 ans", "15y": "15 ans", "20y": "20 ans", "25y": "25 ans", "30y": "30 ans", "35y": "35 ans", "40y": "40 ans",
+                compareLabel: "ETFs à comparer",
+                addEtf: "+ Ajouter un ETF",
+                focusTitle: "Focus :",
+                top10: "Top 10",
+                sectors: "Secteurs",
+                assets: "Classe d'actifs",
+                thNom: "Nom / Catégorie",
+                thPerf: "Perf Ann.",
+                thTE: "Track. Error",
+                thVol: "Volatilité",
+                thTD: "TD Cumulée",
+                yAxisPerf: "Performance (Base 100)",
+                yAxisTD: "Tracking Diff. Cumulée (%)",
+                errDates: "Erreur : Pas assez de dates communes entre les ETFs sélectionnés et le benchmark.",
+                noData: "⚠️ Erreur de données",
+                generateData: "Lancez python get_data.py pour générer les données."
+            },
+            en: {
+                configTitle: "⚙️ Settings",
+                benchLabel: "Reference (Benchmark)",
+                periodLabel: "Time Period",
+                "1y": "1 year", "3y": "3 years", "5y": "5 years", "10y": "10 years", "15y": "15 years", "20y": "20 years", "25y": "25 years", "30y": "30 years", "35y": "35 years", "40y": "40 years",
+                compareLabel: "ETFs to compare",
+                addEtf: "+ Add ETF",
+                focusTitle: "Focus:",
+                top10: "Top 10",
+                sectors: "Sectors",
+                assets: "Asset Classes",
+                thNom: "Name / Category",
+                thPerf: "Ann. Perf",
+                thTE: "Track. Error",
+                thVol: "Volatility",
+                thTD: "Cumul. TD",
+                yAxisPerf: "Performance (Base 100)",
+                yAxisTD: "Cumul. Tracking Diff (%)",
+                errDates: "Error: Not enough common dates between selected ETFs and benchmark.",
+                noData: "⚠️ Data Error",
+                generateData: "Run python get_data.py to generate data."
+            },
+            es: {
+                configTitle: "⚙️ Configuración",
+                benchLabel: "Referencia (Benchmark)",
+                periodLabel: "Período",
+                "1y": "1 año", "3y": "3 años", "5y": "5 años", "10y": "10 años", "15y": "15 años", "20y": "20 años", "25y": "25 años", "30y": "30 años", "35y": "35 años", "40y": "40 años",
+                compareLabel: "ETFs a comparar",
+                addEtf: "+ Añadir ETF",
+                focusTitle: "Enfoque:",
+                top10: "Top 10",
+                sectors: "Sectores",
+                assets: "Clase de activos",
+                thNom: "Nombre / Categoría",
+                thPerf: "Perf An.",
+                thTE: "Error de Seguimiento",
+                thVol: "Volatilidad",
+                thTD: "TD Acumulada",
+                yAxisPerf: "Rendimiento (Base 100)",
+                yAxisTD: "Diferencia de Seguimiento Acum. (%)",
+                errDates: "Error: No hay suficientes fechas comunes entre los ETFs seleccionados y el benchmark.",
+                noData: "⚠️ Error de datos",
+                generateData: "Ejecute python get_data.py para generar datos."
+            }
+        };
+
+        let currentLang = 'fr';
+
+        function updateLanguage() {
+            currentLang = document.getElementById('langSelect').value;
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (translations[currentLang][key]) {
+                    el.innerText = translations[currentLang][key];
+                }
+            });
+            updateApp();
+        }
+
+        // État de l'application : Liste des tickers sélectionnés (au menos 2 por défaut)
+        let selectedTickers = [];
+
+        async function init() {
+            try {
+                const res = await fetch('data.json');
+                if (!res.ok) throw new Error("Erreur lors du chargement de data.json");
+                fullData = await res.json();
+                
+                // Vérification du format
+                if (!fullData.prices || Object.keys(fullData.prices).length === 0) {
+                    throw new Error("Format de données invalide ou data.json vide");
+                }
+
+                const allAvailable = Object.keys(fullData.prices).sort();
+                
+                // Setup Benchmarks
+                const bSelect = document.getElementById('benchSelect');
+                allAvailable.forEach(t => bSelect.add(new Option(t, t)));
+                
+                // État initial (on s'assure que les tickers existent)
+                selectedTickers = allAvailable.slice(0, 2);
+                
+                // Events
+                bSelect.onchange = updateApp;
+                document.getElementById('periodSelect').onchange = updateApp;
+                document.getElementById('focusType').onchange = () => updateFocus(bSelect.value);
+                document.getElementById('langSelect').onchange = updateLanguage;
+
+                updateLanguage();
+            } catch (e) {
+                console.error(e);
+                const t = translations[currentLang];
+                document.body.innerHTML = `
+                    <div class="p-8 text-center">
+                        <h1 class="text-2xl font-bold text-red-600 mb-4">${t.noData}</h1>
+                        <p>${e.message}</p>
+                        <p class="mt-4 text-slate-500">${t.generateData}</p>
+                    </div>`;
+            }
+        }
+
+        function addRow() {
+            const all = Object.keys(fullData.prices);
+            const next = all.find(t => !selectedTickers.includes(t)) || all[0];
+            selectedTickers.push(next);
+            updateApp();
+        }
+
+        function removeRow(index) {
+            if(selectedTickers.length <= 1) return;
+            selectedTickers.splice(index, 1);
+            updateApp();
+        }
+
+        function updateTicker(index, newTicker) {
+            selectedTickers[index] = newTicker;
+            updateApp();
+        }
+
+        function updateApp() {
+            const bench = document.getElementById('benchSelect').value;
+            const period = parseInt(document.getElementById('periodSelect').value);
+            
+            // 1. Déterminer les dates communes pour les tickers sélectionnés + le benchmark
+            const involvedTickers = Array.from(new Set([...selectedTickers, bench]));
+            
+            let commonDatesSet = null;
+            involvedTickers.forEach(t => {
+                const dates = Object.keys(fullData.prices[t]);
+                if (commonDatesSet === null) {
+                    commonDatesSet = new Set(dates);
+                } else {
+                    commonDatesSet = new Set(dates.filter(d => commonDatesSet.has(d)));
+                }
+            });
+
+            if (!commonDatesSet || commonDatesSet.size < 2) {
+                alert(translations[currentLang].errDates);
+                return;
+            }
+
+            // Trier les dates
+            let sortedDates = Array.from(commonDatesSet).sort();
+            
+            // Appliquer la période
+            if (period > 0 && sortedDates.length > period) {
+                sortedDates = sortedDates.slice(-period);
+            }
+
+            const dates = sortedDates;
+            const bPrices = dates.map(d => fullData.prices[bench][d]);
+
+            const datasets = [];
+            const tableHtml = [];
+            const configHtml = [];
+
+            selectedTickers.forEach((ticker, idx) => {
+                const prices = dates.map(d => fullData.prices[ticker][d]);
+                const meta = fullData.metadata[ticker];
+                const color = colors[idx % colors.length];
+
+                // Calculs (sur la base filtrée des dates communes)
+                const annRet = (Math.pow(prices[prices.length-1]/prices[0], 252/prices.length) - 1);
+                let te = 0;
+                let ctd = 0;
+                if(ticker !== bench) {
+                    const diffs = prices.map((p, i) => i>0 ? (Math.log(p/prices[i-1])) - (Math.log(bPrices[i]/bPrices[i-1])) : 0).slice(1);
+                    te = Math.sqrt(diffs.reduce((a,b)=>a+b*b,0)/diffs.length) * Math.sqrt(252);
+                    ctd = (prices[prices.length-1]/prices[0] - bPrices[bPrices.length-1]/bPrices[0]) * 100;
+                }
+
+                // Calcul Volatilité Indépendante (alignée sur les dates de début/fin du graph)
+                const startDate = dates[0];
+                const endDate = dates[dates.length - 1];
+                const tickerAllDates = Object.keys(fullData.prices[ticker]).sort();
+                const filteredVolDates = tickerAllDates.filter(d => d >= startDate && d <= endDate);
+                let volPrices = filteredVolDates.map(d => fullData.prices[ticker][d]);
+                
+                let vol = 0;
+                if (volPrices.length > 1) {
+                    const volReturns = volPrices.map((p, i) => i > 0 ? Math.log(p / volPrices[i-1]) : 0).slice(1);
+                    const meanVol = volReturns.reduce((a, b) => a + b, 0) / volReturns.length;
+                    const varVol = volReturns.reduce((a, b) => a + Math.pow(b - meanVol, 2), 0) / volReturns.length;
+                    vol = Math.sqrt(varVol * 252) * 100;
+                }
+
+                // Data Graphique Perf
+                datasets.push({
+                    label: ticker,
+                    data: prices.map(p => (p/prices[0])*100),
+                    borderColor: color,
+                    borderWidth: ticker === bench ? 3 : 2,
+                    pointRadius: 0,
+                    yAxisID: 'y'
+                });
+
+                // Data Graphique TD (si ce n'est pas le benchmark)
+                if (ticker !== bench) {
+                    datasets.push({
+                        label: `TD ${ticker}`,
+                        data: prices.map((p, i) => (p/prices[0] - bPrices[i]/bPrices[0]) * 100),
+                        borderColor: color,
+                        borderWidth: 1,
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        yAxisID: 'yTD',
+                        hidden: false // Visible par défaut
+                    });
+                }
+
+                // HTML Lignes Config
+                configHtml.push(`
+                    <div class="relative border border-slate-200 rounded-xl p-3 hover:border-indigo-300 transition bg-white shadow-sm overflow-hidden min-h-[85px] flex flex-col justify-center">
+                        <div class="pointer-events-none">
+                            <div class="text-indigo-600 font-bold text-sm leading-tight">${ticker}</div>
+                            <div class="text-[11px] text-slate-600 truncate my-0.5 pr-6">${meta.name}</div>
+                            <div class="text-[10px] font-bold text-slate-400 uppercase">${meta.category}</div>
+                        </div>
+                        <select onchange="updateTicker(${idx}, this.value)" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                            ${Object.keys(fullData.prices).sort().map(t => `
+                                <option value="${t}" ${t===ticker?'selected':''}>
+                                    ${t} - ${fullData.metadata[t].name.substring(0,40)}${fullData.metadata[t].name.length > 40 ? '...' : ''} [${fullData.metadata[t].category}]
+                                </option>
+                            `).join('')}
+                        </select>
+                        <button onclick="removeRow(${idx})" class="absolute top-2 right-2 text-slate-300 hover:text-red-500 z-10 p-1">✕</button>
+                    </div>
+                `);
+
+                // HTML Tableau
+                tableHtml.push(`
+                    <tr class="border-b border-slate-50">
+                        <td class="p-4">
+                            <div class="flex items-center gap-2">
+                                <div class="w-3 h-3 rounded-full" style="background:${color}"></div>
+                                <div>
+                                    <div class="font-bold">${ticker}</div>
+                                    <div class="text-[10px] text-indigo-600 font-semibold uppercase">${meta.category || 'N/A'}</div>
+                                    <div class="text-xs text-slate-400 truncate max-w-[200px]">${meta.name}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="p-4 text-center font-bold text-green-600">${(annRet*100).toFixed(2)}%</td>
+                        <td class="p-4 text-center text-orange-500">${ticker===bench?'-':(te*100).toFixed(2)+'%'}</td>
+                        <td class="p-4 text-center text-slate-600">${vol.toFixed(2)}%</td>
+                        <td class="p-4 text-center font-bold ${ctd >= 0 ? 'text-green-600' : 'text-red-600'}">${ticker===bench?'-':(ctd).toFixed(2)+'%'}</td>
+                    </tr>
+                `);
+            });
+
+            document.getElementById('tickerList').innerHTML = configHtml.join('');
+            document.getElementById('metricsTableBody').innerHTML = tableHtml.join('');
+            renderMainChart(dates, datasets);
+            updateFocus(bench);
+        }
+
+        function renderMainChart(labels, datasets) {
+            if(mainChart) mainChart.destroy();
+            mainChart = new Chart(document.getElementById('mainChart'), {
+                type: 'line',
+                data: { labels, datasets },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    scales: { 
+                        y: { 
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            ticks: { callback: v => v.toFixed(0) + '%' },
+                            title: { display: true, text: translations[currentLang].yAxisPerf }
+                        },
+                        yTD: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            ticks: { callback: v => v.toFixed(1) + '%' },
+                            title: { display: true, text: translations[currentLang].yAxisTD },
+                            grid: { drawOnChartArea: false }
+                        }
+                    } 
+                }
+            });
+        }
+
+        function updateFocus(bench) {
+            const meta = fullData.metadata[bench];
+            const type = document.getElementById('focusType').value;
+            const content = document.getElementById('focusContent');
+            const list = document.getElementById('holdingsList');
+            document.getElementById('focusName').innerText = bench;
+
+            if(focusChart) focusChart.destroy();
+            content.classList.remove('hidden');
+            list.classList.add('hidden');
+
+            if(type === 'holdings') {
+                content.classList.add('hidden');
+                list.classList.remove('hidden');
+                console.log(meta.top_holdings);
+                list.innerHTML = meta.top_holdings.slice(0,10).map(h => `<div class="flex justify-between border-b border-indigo-800 pb-1"><span>${h.Name || 'N/A'}</span><span>${(h['Holding Percent'] || 0).toFixed(3)}%</span></div>`).join('');
+            } else {
+                const dataObj = type === 'sectors' ? meta.sectors : meta.assets_alloc;
+                const labels = Object.keys(dataObj);
+                const values = Object.values(dataObj);
+
+                // Il faut enregistrer le plugin s'il n'est pas activé globalement
+                // 1. IMPORTANT : Enregistrer le plugin avant de créer le graphique
+                // Enregistrement du plugin
+                Chart.register(ChartDataLabels);
+
+                const ctx = document.getElementById('focusChart').getContext('2d');
+
+                focusChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: values,
+                            backgroundColor: colors,
+                            borderWidth: 2,
+                            borderColor: '#1e1e1e' // Couleur du fond pour séparer les segments
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        layout: {
+                            // Padding important pour ne pas que les noms sortent du canvas
+                            padding: 40 
+                        },
+                        plugins: {
+                            legend: {
+                                display: false // Désactive la légende par défaut
+                            },
+                            datalabels: {
+                                color: 'white',
+                                anchor: 'end',    // Ancre à la fin du segment
+                                align: 'end',     // Projette le texte vers l'extérieur
+                                offset: 15,       // Distance entre le donut et le texte
+                                font: {
+                                    size: 12,
+                                    weight: '500'
+                                },
+                                // Affiche le nom de la catégorie
+                                formatter: (value, context) => {
+                                    return context.chart.data.labels[context.dataIndex];
+                                },
+                                // Optionnel : ne pas afficher si la part est trop petite (< 3%)
+                                display: (context) => {
+                                    const dataset = context.dataset.data;
+                                    const total = dataset.reduce((a, b) => a + b, 0);
+                                    const value = dataset[context.dataIndex];
+                                    return (value / total) > 0.03; 
+                                }
+                            }
+                        },
+                        cutout: '65%' // Épaisseur du donut
+                    }
+                });
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

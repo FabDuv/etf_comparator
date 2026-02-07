@@ -447,7 +447,7 @@
                 content.classList.add('hidden');
                 list.classList.remove('hidden');
                 console.log(meta.top_holdings);
-                list.innerHTML = meta.top_holdings.slice(0,10).map(h => `<div class="flex justify-between border-b border-indigo-800 pb-1"><span>${h.Name || 'N/A'}</span><span>${(h['Holding Percent'] || 0).toFixed(3)}%</span></div>`).join('');
+                list.innerHTML = meta.top_holdings.slice(0,10).map(h => `<div class="flex justify-between border-b border-indigo-800 pb-1"><span>${h.Name || 'N/A'}</span><span>${(h['Holding Percent'] * 100 || 0).toFixed(3)}%</span></div>`).join('');
             } else {
                 const dataObj = type === 'sectors' ? meta.sectors : meta.assets_alloc;
                 const labels = Object.keys(dataObj);
